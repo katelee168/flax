@@ -29,6 +29,7 @@ import jax
 import jax.numpy as jnp
 import ml_collections
 import numpy as np
+import optax
 import tensorflow_datasets as tfds
 
 
@@ -68,12 +69,8 @@ def onehot(labels, num_classes=10):
   return x.astype(jnp.float32)
 
 
-def cross_entropy_loss(logits, labels):
-  return -jnp.mean(jnp.sum(onehot(labels) * logits, axis=-1))
-
-
 def compute_metrics(logits, labels):
-  loss = cross_entropy_loss(logits, labels)
+  loss = jnp.mean(optax.softmax_cross_entropy(logits, onehot(labels)))
   accuracy = jnp.mean(jnp.argmax(logits, -1) == labels)
   metrics = {
       'loss': loss,
@@ -87,7 +84,7 @@ def train_step(optimizer, batch):
   """Train for a single step."""
   def loss_fn(params):
     logits = CNN().apply({'params': params}, batch['image'])
-    loss = cross_entropy_loss(logits, batch['label'])
+    loss = jnp.mean(optax.softmax_cross_entropy(logits, onehot(batch['label'])))
     return loss, logits
   grad_fn = jax.value_and_grad(loss_fn, has_aux=True)
   (_, logits), grad = grad_fn(optimizer.target)
